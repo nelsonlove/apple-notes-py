@@ -1,0 +1,20 @@
+[project]
+name = "apple-notes"
+version = "0.1.0"
+description = "CLI and library for reading, creating, and searching Apple Notes"
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.1",
+    "protobuf>=5.29",
+    "lancedb>=0.20",
+    "sentence-transformers>=3.0",
+    "markdownify>=0.13",
+    "markdown>=3.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+notes = "apple_notes.cli:cli"
