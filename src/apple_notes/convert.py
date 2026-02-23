@@ -11,4 +11,7 @@ def html_to_markdown(html: str) -> str:
 
 def markdown_to_html(md: str) -> str:
     """Convert Markdown to HTML using the markdown library."""
-    return markdown.markdown(md)
+    return markdown.markdown(
+        md,
+        extensions=["tables", "fenced_code", "sane_lists", "nl2br"],
+    )
