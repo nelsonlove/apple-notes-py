@@ -1,12 +1,14 @@
 """Click CLI for Apple Notes — thin layer over library modules."""
 
 import json
+import re
 import sys
+from pathlib import Path
 
 import click
 
 from .db import NotesDB
-from .decode import decode_note_content
+from .decode import decode_note_content, decode_note_to_markdown
 
 
 @click.group()
@@ -210,3 +212,158 @@ def build_index(ctx, force, show_status):
     click.echo(f"Decoded {len(decoded)} notes with content.")
     count = idx.build(decoded, force=force)
     click.echo(f"Indexed {count} notes into LanceDB.")
+
+
+# ── helpers ─────────────────────────────────────────────────────────────
+
+def _sanitize_filename(title: str) -> str:
+    """Turn a note title into a safe filename (no extension)."""
+    name = re.sub(r'[/:*?"<>|\x00]', '_', title)
+    return name.strip('. ')[:200] or 'untitled'
+
+
+def _unique_path(directory: Path, stem: str, suffix: str) -> Path:
+    """Return a path in *directory* that doesn't collide with existing files."""
+    candidate = directory / f"{stem}{suffix}"
+    counter = 2
+    while candidate.exists():
+        candidate = directory / f"{stem}_{counter}{suffix}"
+        counter += 1
+    return candidate
+
+
+def _format_frontmatter(note: dict) -> str:
+    """Build YAML front-matter block from note metadata."""
+    lines = ['---']
+    lines.append(f'title: "{note["title"]}"')
+    lines.append(f'folder: "{note.get("folder", "")}"')
+    if note.get("createdAt"):
+        lines.append(f'created: "{note["createdAt"]}"')
+    if note.get("modifiedAt"):
+        lines.append(f'modified: "{note["modifiedAt"]}"')
+    lines.append('---')
+    return '\n'.join(lines)
+
+
+def _parse_frontmatter(text: str) -> tuple[dict, str]:
+    """Split YAML front-matter from body. Returns (metadata dict, body)."""
+    if not text.startswith('---'):
+        return {}, text
+    parts = text.split('---', 2)
+    if len(parts) < 3:
+        return {}, text
+    meta = {}
+    for line in parts[1].strip().splitlines():
+        if ':' in line:
+            key, _, val = line.partition(':')
+            meta[key.strip()] = val.strip().strip('"').strip("'")
+    return meta, parts[2].strip()
+
+
+def _export_note(note: dict) -> str:
+    """Decode a note dict and return Markdown with front-matter."""
+    md = decode_note_to_markdown(note.get("content"), skip_title=True)
+    fm = _format_frontmatter(note)
+    return f"{fm}\n\n{md}\n" if md else f"{fm}\n"
+
+
+def _export_many(notes: list[dict], out_dir: Path) -> int:
+    """Write multiple notes as .md files into out_dir. Returns count."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for n in notes:
+        if n.get("locked"):
+            continue
+        md = decode_note_to_markdown(n.get("content"), skip_title=True)
+        if not md:
+            continue
+        fm = _format_frontmatter(n)
+        stem = _sanitize_filename(n["title"])
+        path = _unique_path(out_dir, stem, ".md")
+        path.write_text(f"{fm}\n\n{md}\n", encoding="utf-8")
+        count += 1
+    return count
+
+
+# ── export ──────────────────────────────────────────────────────────────
+
+@cli.command("export")
+@click.argument("title", required=False)
+@click.option("--by-id", type=int, default=None, help="Export by primary key.")
+@click.option("--folder", default=None, help="Export all notes in a folder.")
+@click.option("--all", "export_all", is_flag=True, help="Export every note.")
+@click.option("-o", "--output", default=None,
+              help="Output file or directory. Omit to print to stdout (single note).")
+@click.pass_context
+def export_notes(ctx, title, by_id, folder, export_all, output):
+    """Export notes as Markdown files with YAML front-matter."""
+    db = _get_db(ctx)
+
+    # ── bulk export (folder or all) ─────────────────────────────────
+    if folder or export_all:
+        if not output:
+            raise click.UsageError("Provide -o/--output directory for bulk export.")
+        out_dir = Path(output)
+        notes = db.get_all_notes_with_content()
+        if folder:
+            notes = [n for n in notes if n.get("folder") == folder]
+        if not notes:
+            click.echo("No notes found.", err=True)
+            sys.exit(1)
+        count = _export_many(notes, out_dir)
+        click.echo(f"Exported {count} notes to {out_dir}/")
+        return
+
+    # ── single note export ──────────────────────────────────────────
+    if by_id is not None:
+        note = db.get_note_by_pk(by_id)
+    elif title:
+        note = db.get_note_by_title(title)
+    else:
+        raise click.UsageError("Provide a TITLE, --by-id, --folder, or --all.")
+
+    if not note:
+        click.echo("Note not found.", err=True)
+        sys.exit(1)
+
+    md = _export_note(note)
+
+    if output:
+        Path(output).write_text(md, encoding="utf-8")
+        click.echo(f"Exported to {output}")
+    else:
+        click.echo(md)
+
+
+# ── import ──────────────────────────────────────────────────────────────
+
+@cli.command("import")
+@click.argument("path", type=click.Path(exists=True))
+def import_notes(path):
+    """Import Markdown files as Apple Notes."""
+    from .convert import markdown_to_html
+    from .jxa import create_note
+
+    target = Path(path)
+
+    if target.is_dir():
+        files = sorted(target.glob("*.md"))
+        if not files:
+            click.echo("No .md files found in directory.", err=True)
+            sys.exit(1)
+        for f in files:
+            _import_one(f, markdown_to_html, create_note)
+    elif target.is_file():
+        _import_one(target, markdown_to_html, create_note)
+    else:
+        raise click.UsageError(f"Not a file or directory: {path}")
+
+
+def _import_one(filepath: Path, md_to_html, create_fn):
+    """Read a single .md file and create a note from it."""
+    raw = filepath.read_text(encoding="utf-8")
+    meta, body = _parse_frontmatter(raw)
+    title = meta.get("title") or filepath.stem
+    html_body = md_to_html(body)
+    create_fn(title, html_body)
+    click.echo(f"Imported: {title}")

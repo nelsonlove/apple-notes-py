@@ -4,6 +4,8 @@ CLI and library for reading, creating, and searching Apple Notes.
 
 - **Read** notes, folders, and content via direct SQLite access + protobuf decoding
 - **Create** notes via JXA (JavaScript for Automation)
+- **Export** notes to Markdown files with YAML front-matter
+- **Import** Markdown files into Apple Notes
 - **Search** with text, semantic (sentence-transformers), or hybrid (RRF fusion) modes
 
 Requires macOS with Full Disk Access enabled for the terminal.
@@ -33,6 +35,17 @@ notes folders --json
 notes create "My Note" --body "Hello **world**"
 notes create "My Note" --body-file draft.md
 notes create "My Note" --body "<h1>Hi</h1>" --html
+
+# Export notes to Markdown
+notes export "Some Note Title"                  # print to stdout
+notes export "Some Note Title" -o note.md       # write to file
+notes export --by-id 1234 -o note.md            # by primary key
+notes export --folder "My Folder" -o ./out/     # all notes in folder
+notes export --all -o ./out/                    # every note
+
+# Import Markdown files as notes
+notes import note.md                            # single file
+notes import ./notes-dir/                       # all .md files in directory
 
 # Build semantic search index
 notes index
