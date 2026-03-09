@@ -95,7 +95,7 @@ class NotesDB:
             note.ztitle1 AS title,
             folder.ztitle2 AS folder,
             datetime(note.zmodificationdate1 + {_COREDATA_EPOCH}, 'unixepoch') AS modifiedAt,
-            datetime(note.zcreationdate1 + {_COREDATA_EPOCH}, 'unixepoch') AS createdAt,
+            datetime(note.zcreationdate3 + {_COREDATA_EPOCH}, 'unixepoch') AS createdAt,
             note.zsnippet AS snippet,
             notedata.zdata AS content,
             acc.zname AS account,
@@ -125,7 +125,7 @@ class NotesDB:
             note.ztitle1 AS title,
             folder.ztitle2 AS folder,
             datetime(note.zmodificationdate1 + {_COREDATA_EPOCH}, 'unixepoch') AS modifiedAt,
-            datetime(note.zcreationdate1 + {_COREDATA_EPOCH}, 'unixepoch') AS createdAt,
+            datetime(note.zcreationdate3 + {_COREDATA_EPOCH}, 'unixepoch') AS createdAt,
             note.zsnippet AS snippet,
             notedata.zdata AS content,
             acc.zname AS account,
@@ -211,7 +211,7 @@ class NotesDB:
             note.ztitle1 AS title,
             folder.ztitle2 AS folder,
             datetime(note.zmodificationdate1 + {_COREDATA_EPOCH}, 'unixepoch') AS modifiedAt,
-            datetime(note.zcreationdate1 + {_COREDATA_EPOCH}, 'unixepoch') AS createdAt,
+            datetime(note.zcreationdate3 + {_COREDATA_EPOCH}, 'unixepoch') AS createdAt,
             notedata.zdata AS content,
             (note.zispasswordprotected = 1) AS locked
         FROM ziccloudsyncingobject AS note
