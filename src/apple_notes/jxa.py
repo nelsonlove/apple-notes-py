@@ -35,3 +35,39 @@ def create_note(title: str, body_html: str) -> None:
     }}}});
     """
     _run_jxa(script)
+
+
+def delete_note(title: str) -> None:
+    """Move a note to Recently Deleted (trash) by title.
+
+    Args:
+        title: Exact note title.
+    """
+    safe_title = json.dumps(title)
+    script = f"""
+    const app = Application('Notes');
+    const matches = app.notes.whose({{name: {safe_title}}})();
+    if (matches.length === 0) throw new Error('Note not found: ' + {safe_title});
+    app.delete(matches[0]);
+    """
+    _run_jxa(script)
+
+
+def move_note(title: str, folder_name: str) -> None:
+    """Move a note to a different folder by title.
+
+    Args:
+        title: Exact note title.
+        folder_name: Target folder name.
+    """
+    safe_title = json.dumps(title)
+    safe_folder = json.dumps(folder_name)
+    script = f"""
+    const app = Application('Notes');
+    const matches = app.notes.whose({{name: {safe_title}}})();
+    if (matches.length === 0) throw new Error('Note not found: ' + {safe_title});
+    const folders = app.folders.whose({{name: {safe_folder}}})();
+    if (folders.length === 0) throw new Error('Folder not found: ' + {safe_folder});
+    app.move(matches[0], {{to: folders[0]}});
+    """
+    _run_jxa(script)
