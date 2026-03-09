@@ -39,8 +39,18 @@ class NotesDB:
                 cur.execute(sql, params)
                 return [dict(row) for row in cur.fetchall()]
 
-    def get_all_notes(self, folder: str | None = None, limit: int | None = None) -> list[dict[str, Any]]:
-        """List notes with metadata (no content blob)."""
+    def get_all_notes(self, folder: str | None = None, limit: int | None = None,
+                      sort_by: str = "modified", order: str = "desc") -> list[dict[str, Any]]:
+        """List notes with metadata (no content blob).
+
+        Args:
+            folder: Filter by folder name.
+            limit: Max notes to return.
+            sort_by: "modified" or "created".
+            order: "asc" or "desc".
+        """
+        sort_col = "note.zcreationdate3" if sort_by == "created" else "note.zmodificationdate1"
+        order_dir = "ASC" if order.lower() == "asc" else "DESC"
         sql = f"""
         SELECT
             'x-coredata://' || zmd.z_uuid || '/ICNote/p' || note.z_pk AS id,
@@ -48,6 +58,7 @@ class NotesDB:
             note.ztitle1 AS title,
             folder.ztitle2 AS folder,
             datetime(note.zmodificationdate1 + {_COREDATA_EPOCH}, 'unixepoch') AS modifiedAt,
+            datetime(note.zcreationdate3 + {_COREDATA_EPOCH}, 'unixepoch') AS createdAt,
             note.zsnippet AS snippet,
             acc.zname AS account,
             note.zidentifier AS uuid,
@@ -65,7 +76,7 @@ class NotesDB:
             AND note.zmarkedfordeletion != 1
             AND folder.zmarkedfordeletion != 1
             {"AND folder.ztitle2 = ?" if folder else ""}
-        ORDER BY note.zmodificationdate1 DESC
+        ORDER BY {sort_col} {order_dir}
         {"LIMIT ?" if limit else ""}
         """
         params: tuple = ()
