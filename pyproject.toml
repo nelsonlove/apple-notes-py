@@ -1,20 +1,34 @@
 [project]
-name = "apple-notes"
-version = "0.1.0"
-description = "CLI and library for reading, creating, and searching Apple Notes"
+name = "apple-notes-py"
+version = "0.2.0"
+description = "Python library, CLI, and MCP server for Apple Notes"
 requires-python = ">=3.12"
 dependencies = [
     "click>=8.1",
     "protobuf>=5.29",
-    "lancedb>=0.20",
-    "sentence-transformers>=3.0",
     "markdownify>=0.13",
     "markdown>=3.6",
 ]
+
+[project.optional-dependencies]
+search = [
+    "lancedb>=0.20",
+    "sentence-transformers>=3.0",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.1",
+    "mypy>=1.0",
+    "build>=1.0",
+]
+
+[project.scripts]
+apple-notes = "apple_notes.cli:cli"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[project.scripts]
-notes = "apple_notes.cli:cli"
+[tool.hatch.build.targets.wheel]
+packages = ["src/apple_notes"]

@@ -1,12 +1,12 @@
-"""LanceDB + sentence-transformers semantic search with FTS and RRF fusion."""
+"""LanceDB + sentence-transformers semantic search with FTS and RRF fusion.
+
+Requires optional dependencies: pip install 'apple-notes-py[search]'
+"""
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
-
-import lancedb
-import pyarrow as pa
 
 _DATA_DIR = Path.home() / ".apple-notes" / "data"
 _TABLE_NAME = "notes"
@@ -16,17 +16,28 @@ _RRF_K = 60
 
 
 class SearchIndex:
-    """Lazy-loaded semantic search index backed by LanceDB."""
+    """Lazy-loaded semantic search index backed by LanceDB.
+
+    Requires optional dependencies: lancedb, sentence-transformers.
+    Install with: pip install 'apple-notes-py[search]'
+    """
 
     def __init__(self, data_dir: str | Path | None = None):
         self._data_dir = Path(data_dir) if data_dir else _DATA_DIR
-        self._db: lancedb.DBConnection | None = None
+        self._db = None
         self._model = None
 
     # ── lazy accessors ───────────────────────────────────────────────
 
-    def _get_db(self) -> lancedb.DBConnection:
+    def _get_db(self):
         if self._db is None:
+            try:
+                import lancedb
+            except ModuleNotFoundError:
+                raise RuntimeError(
+                    "Semantic search requires the 'search' extras.\n"
+                    "Install with: pip install 'apple-notes-py[search]'"
+                )
             self._data_dir.mkdir(parents=True, exist_ok=True)
             self._db = lancedb.connect(str(self._data_dir))
         return self._db
@@ -47,7 +58,7 @@ class SearchIndex:
 
     # ── table management ─────────────────────────────────────────────
 
-    def _get_table(self) -> lancedb.table.Table:
+    def _get_table(self):
         db = self._get_db()
         return db.open_table(_TABLE_NAME)
 
@@ -81,6 +92,8 @@ class SearchIndex:
                 "content": note["content"],
                 "vector": vec,
             })
+
+        import pyarrow as pa
 
         schema = pa.schema([
             pa.field("pk", pa.int64()),
