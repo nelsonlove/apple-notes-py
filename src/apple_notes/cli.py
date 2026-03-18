@@ -240,22 +240,35 @@ def search_notes(ctx, query, mode, limit):
 @click.option("--status", "show_status", is_flag=True, help="Show index stats and exit.")
 @click.pass_context
 def build_index(ctx, force, show_status):
-    """Build or update the semantic search index."""
+    """Build or update the semantic search index.
+
+    Requires search extras: pip install 'apple-notes-py[search]'
+    """
     client = _client(ctx)
 
-    if show_status:
-        info = client.index_status()
-        if _output_json(ctx):
-            _emit(ctx, info)
-        else:
-            click.echo(json.dumps(info, indent=2))
-        return
+    try:
+        if show_status:
+            info = client.index_status()
+            if _output_json(ctx):
+                _emit(ctx, info)
+            else:
+                click.echo(json.dumps(info, indent=2))
+            return
 
-    count = client.build_index(force=force)
-    if _output_json(ctx):
-        _emit(ctx, {"indexed": count})
-    else:
-        click.echo(f"Indexed {count} notes into LanceDB.")
+        count = client.build_index(force=force)
+        if _output_json(ctx):
+            _emit(ctx, {"indexed": count})
+        else:
+            click.echo(f"Indexed {count} notes into LanceDB.")
+    except RuntimeError as e:
+        if "search" in str(e).lower():
+            if _output_json(ctx):
+                _emit_error("missing_dependency", str(e),
+                            "Install with: pip install 'apple-notes-py[search]'")
+            else:
+                click.echo(f"Error: {e}", err=True)
+            sys.exit(1)
+        raise
 
 
 # ── export ──────────────────────────────────────────────────────────────
@@ -330,12 +343,27 @@ def import_notes(ctx, path, dry_run):
     if target.is_dir():
         files = sorted(target.glob("*.md"))
         if not files:
-            click.echo("No .md files found in directory.", err=True)
+            if _output_json(ctx):
+                _emit_error("no_files", "No .md files found in directory")
+            else:
+                click.echo("No .md files found in directory.", err=True)
             sys.exit(1)
+        results = []
         for f in files:
-            _import_one(f, client, dry_run, ctx)
+            results.append(_import_one(f, client, dry_run))
+        if _output_json(ctx):
+            _emit(ctx, results)
+        else:
+            for r in results:
+                action = "Would import" if dry_run else "Imported"
+                click.echo(f"{action}: {r['title']}")
     elif target.is_file():
-        _import_one(target, client, dry_run, ctx)
+        result = _import_one(target, client, dry_run)
+        if _output_json(ctx):
+            _emit(ctx, result)
+        else:
+            action = "Would import" if dry_run else "Imported"
+            click.echo(f"{action}: {result['title']}")
     else:
         raise click.UsageError(f"Not a file or directory: {path}")
 
@@ -373,21 +401,14 @@ def _parse_frontmatter(text: str) -> tuple[dict, str]:
     return meta, parts[2].strip()
 
 
-def _import_one(filepath: Path, client: NotesClient, dry_run: bool, ctx):
-    """Read a single .md file and create a note from it."""
+def _import_one(filepath: Path, client: NotesClient, dry_run: bool) -> dict:
+    """Read a single .md file and create a note. Returns result dict."""
     raw = filepath.read_text(encoding="utf-8")
     meta, body = _parse_frontmatter(raw)
     title = meta.get("title") or filepath.stem
 
     if dry_run:
-        if _output_json(ctx):
-            _emit(ctx, {"action": "import", "title": title, "dry_run": True})
-        else:
-            click.echo(f"Would import: {title}")
-        return
+        return {"title": title, "dry_run": True}
 
     client.create_note(title, body)
-    if _output_json(ctx):
-        _emit(ctx, {"imported": title})
-    else:
-        click.echo(f"Imported: {title}")
+    return {"title": title, "imported": True}
