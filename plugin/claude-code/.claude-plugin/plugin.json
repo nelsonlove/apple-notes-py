@@ -1,0 +1,11 @@
+{
+  "name": "apple-notes",
+  "version": "0.2.0",
+  "description": "Apple Notes integration — read, create, search, and triage notes via MCP",
+  "author": {
+    "name": "Nelson Love"
+  },
+  "repository": "https://github.com/nelsonlove/apple-notes-py",
+  "license": "MIT",
+  "keywords": ["apple-notes", "notes", "triage", "mcp"]
+}
