@@ -24,8 +24,9 @@ Dependency direction: `plugin → CLI → NotesClient → db/jxa/decode/search`
 ## Development
 
 ```bash
-pip install -e ".[search,dev]"   # full install with search + dev tools
-pip install -e .                  # core only (no semantic search)
+uv run pytest                          # run tests
+uv run apple-notes --help              # run CLI
+uv sync --extra search --extra dev     # full install into .venv
 ```
 
 ## CLI conventions
