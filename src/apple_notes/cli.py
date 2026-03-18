@@ -88,7 +88,8 @@ def get_note(ctx, title, by_id):
     if not note:
         if _output_json(ctx):
             _emit_error("not_found", "Note not found")
-        click.echo("Note not found.", err=True)
+        else:
+            click.echo("Note not found.", err=True)
         sys.exit(1)
 
     if _output_json(ctx):
@@ -276,18 +277,20 @@ def export_notes(ctx, title, by_id, folder, export_all, output):
         if not output:
             raise click.UsageError("Provide -o/--output directory for bulk export.")
         out_dir = Path(output)
+        out_dir.mkdir(parents=True, exist_ok=True)
 
-        # For bulk export, we need the raw DB rows with content blobs
-        notes_raw = client._db.get_all_notes_with_content()
-        if folder:
-            notes_raw = [n for n in notes_raw if n.get("folder") == folder]
-        if not notes_raw:
+        exported = client.export_notes(folder=folder)
+        if not exported:
             click.echo("No notes found.", err=True)
             sys.exit(1)
 
-        from .decode import decode_note_to_markdown
+        count = 0
+        for note, md in exported:
+            stem = _sanitize_filename(note.title)
+            path = _unique_path(out_dir, stem, ".md")
+            path.write_text(md, encoding="utf-8")
+            count += 1
 
-        count = _export_many(notes_raw, out_dir, decode_note_to_markdown)
         if _output_json(ctx):
             _emit(ctx, {"exported": count, "directory": str(out_dir)})
         else:
@@ -330,9 +333,9 @@ def import_notes(ctx, path, dry_run):
             click.echo("No .md files found in directory.", err=True)
             sys.exit(1)
         for f in files:
-            _import_one(f, client, dry_run, _output_json(ctx))
+            _import_one(f, client, dry_run, ctx)
     elif target.is_file():
-        _import_one(target, client, dry_run, _output_json(ctx))
+        _import_one(target, client, dry_run, ctx)
     else:
         raise click.UsageError(f"Not a file or directory: {path}")
 
@@ -355,19 +358,6 @@ def _unique_path(directory: Path, stem: str, suffix: str) -> Path:
     return candidate
 
 
-def _format_frontmatter(note: dict) -> str:
-    """Build YAML front-matter block from note metadata."""
-    lines = ['---']
-    lines.append(f'title: "{note["title"]}"')
-    lines.append(f'folder: "{note.get("folder", "")}"')
-    if note.get("createdAt"):
-        lines.append(f'created: "{note["createdAt"]}"')
-    if note.get("modifiedAt"):
-        lines.append(f'modified: "{note["modifiedAt"]}"')
-    lines.append('---')
-    return '\n'.join(lines)
-
-
 def _parse_frontmatter(text: str) -> tuple[dict, str]:
     """Split YAML front-matter from body. Returns (metadata dict, body)."""
     if not text.startswith('---'):
@@ -383,34 +373,21 @@ def _parse_frontmatter(text: str) -> tuple[dict, str]:
     return meta, parts[2].strip()
 
 
-def _export_many(notes: list[dict], out_dir: Path, decode_fn) -> int:
-    """Write multiple notes as .md files into out_dir. Returns count."""
-    out_dir.mkdir(parents=True, exist_ok=True)
-    count = 0
-    for n in notes:
-        if n.get("locked"):
-            continue
-        md = decode_fn(n.get("content"), skip_title=True)
-        if not md:
-            continue
-        fm = _format_frontmatter(n)
-        stem = _sanitize_filename(n["title"])
-        path = _unique_path(out_dir, stem, ".md")
-        path.write_text(f"{fm}\n\n{md}\n", encoding="utf-8")
-        count += 1
-    return count
-
-
-def _import_one(filepath: Path, client: NotesClient, dry_run: bool, as_json: bool):
+def _import_one(filepath: Path, client: NotesClient, dry_run: bool, ctx):
     """Read a single .md file and create a note from it."""
     raw = filepath.read_text(encoding="utf-8")
     meta, body = _parse_frontmatter(raw)
     title = meta.get("title") or filepath.stem
 
     if dry_run:
-        click.echo(f"Would import: {title}" if not as_json else
-                    json.dumps({"action": "import", "title": title}))
+        if _output_json(ctx):
+            _emit(ctx, {"action": "import", "title": title, "dry_run": True})
+        else:
+            click.echo(f"Would import: {title}")
         return
 
     client.create_note(title, body)
-    click.echo(f"Imported: {title}")
+    if _output_json(ctx):
+        _emit(ctx, {"imported": title})
+    else:
+        click.echo(f"Imported: {title}")

@@ -116,22 +116,22 @@ class NotesClient:
     def create_note(self, title: str, body_markdown: str) -> None:
         """Create a new note. Body is Markdown, converted to HTML automatically."""
         from .convert import markdown_to_html
-        from .jxa import create_note
+        from .jxa import create_note as jxa_create
 
         html = markdown_to_html(body_markdown)
-        create_note(title, html)
+        jxa_create(title, html)
 
     def delete_note(self, title: str) -> None:
         """Move a note to Recently Deleted by title."""
-        from .jxa import delete_note
+        from .jxa import delete_note as jxa_delete
 
-        delete_note(title)
+        jxa_delete(title)
 
     def move_note(self, title: str, folder: str) -> None:
         """Move a note to a different folder by title."""
-        from .jxa import move_note
+        from .jxa import move_note as jxa_move
 
-        move_note(title, folder)
+        jxa_move(title, folder)
 
     # ── Export ────────────────────────────────────────────────────────
 
@@ -163,6 +163,46 @@ class NotesClient:
 
         frontmatter = "\n".join(fm_lines)
         return f"{frontmatter}\n\n{md_body}\n" if md_body else f"{frontmatter}\n"
+
+    def export_notes(
+        self,
+        *,
+        folder: str | None = None,
+    ) -> list[tuple[Note, str]]:
+        """Export multiple notes as (Note, markdown) pairs.
+
+        Args:
+            folder: Filter by folder name. If None, exports all notes.
+
+        Returns:
+            List of (Note metadata, markdown string with frontmatter) tuples.
+            Locked and empty notes are skipped.
+        """
+        rows = self._db.get_all_notes_with_content()
+        if folder:
+            rows = [r for r in rows if r.get("folder") == folder]
+
+        results = []
+        for r in rows:
+            if r.get("locked"):
+                continue
+            md_body = decode_note_to_markdown(r.get("content"), skip_title=True)
+            if not md_body:
+                continue
+            note = _row_to_note(r)
+            fm_lines = [
+                "---",
+                f'title: "{r.get("title", "")}"',
+                f'folder: "{r.get("folder", "")}"',
+            ]
+            if r.get("createdAt"):
+                fm_lines.append(f'created: "{r["createdAt"]}"')
+            if r.get("modifiedAt"):
+                fm_lines.append(f'modified: "{r["modifiedAt"]}"')
+            fm_lines.append("---")
+            frontmatter = "\n".join(fm_lines)
+            results.append((note, f"{frontmatter}\n\n{md_body}\n"))
+        return results
 
     # ── Search index management ──────────────────────────────────────
 

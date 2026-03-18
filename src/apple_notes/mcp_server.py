@@ -64,7 +64,7 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "query": {"type": "string", "description": "Search query"},
-                "mode": {"type": "string", "enum": ["text", "semantic", "hybrid"], "description": "Search mode (default: text)"},
+                "mode": {"type": "string", "enum": ["text", "semantic", "hybrid"], "description": "Search mode (default: hybrid)"},
                 "limit": {"type": "integer", "description": "Max results (default: 20)"},
             },
             "required": ["query"],
@@ -139,7 +139,7 @@ def _handle_tool(tool: str, args: dict) -> str:
     elif tool == "search_notes":
         results = _client.search(
             args["query"],
-            mode=args.get("mode", "text"),
+            mode=args.get("mode", "hybrid"),
             limit=args.get("limit", 20),
         )
         return json.dumps([asdict(r) for r in results], default=str)
