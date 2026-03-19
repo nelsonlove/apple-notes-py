@@ -1,0 +1,28 @@
+#!/bin/bash
+# Ensure a Python CLI tool is installed, then run it.
+# Tries: PATH → uvx → plugin-local venv.
+set -euo pipefail
+
+PACKAGE="apple-notes-py"
+TOOL="${1:-apple-notes}"
+shift 2>/dev/null || true
+
+# Option 1: already on PATH
+if command -v "$TOOL" &>/dev/null; then
+    exec "$TOOL" "$@"
+fi
+
+# Option 2: uvx (cached, isolated)
+if command -v uvx &>/dev/null; then
+    exec uvx --from "$PACKAGE" "$TOOL" "$@"
+fi
+
+# Option 3: plugin-local venv
+PLUGIN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+VENV_DIR="${PLUGIN_DIR}/.venv"
+if [ ! -d "$VENV_DIR" ]; then
+    echo "Installing ${PACKAGE} (one-time setup)..." >&2
+    python3 -m venv "$VENV_DIR"
+    "$VENV_DIR/bin/pip" install -q "$PACKAGE"
+fi
+exec "$VENV_DIR/bin/$TOOL" "$@"

@@ -5,41 +5,52 @@ description: Use when the user asks to find, read, create, or search their Apple
 
 # Apple Notes Operations
 
-## Available MCP Tools
-
-### Reading
-- **list_notes** — List notes with metadata. Params: `folder`, `limit`, `sort_by` (modified/created), `order` (asc/desc)
-- **get_note** — Get full note content. Params: `title` (exact match) or `id` (primary key)
-- **list_folders** — List all folders with note counts
-- **search_notes** — Search by text, semantic similarity, or hybrid. Params: `query`, `mode` (text/semantic/hybrid), `limit`
-
-### Writing
-- **create_note** — Create a note with Markdown body. Params: `title`, `body`
-- **move_note** — Move to a different folder. Params: `title`, `folder`
-- **delete_note** — Move to Recently Deleted (30-day recovery). Params: `title`
-
-### Export
-- **export_note** — Return note as Markdown with YAML frontmatter. Params: `title` or `id`
-
-## CLI Alternative
-
-All operations are also available via the `apple-notes` CLI with `--json` for structured output:
+Use the `apple-notes` CLI with `--json` for all operations. Run commands via the launcher:
 
 ```bash
-apple-notes --json list --folder "Notes" --limit 10
-apple-notes --json get "My Note"
-apple-notes --json search "query" --mode hybrid
-apple-notes create "Title" --body "# Content" --dry-run
+${CLAUDE_PLUGIN_ROOT}/bin/run apple-notes --json <command>
 ```
+
+## Commands
+
+### Reading
+```bash
+apple-notes --json list                           # all notes
+apple-notes --json list --folder "Notes" --limit 10
+apple-notes --json get "My Note"                  # by title
+apple-notes --json get --id 42                    # by primary key
+apple-notes --json folders                        # list folders
+apple-notes --json search "query"                 # text search
+apple-notes --json search "query" --mode hybrid   # semantic search
+```
+
+### Writing
+```bash
+apple-notes create "Title" --body "# Markdown content" --dry-run
+apple-notes move "Note Title" --folder "Destination"  --dry-run
+apple-notes delete "Note Title" --dry-run
+```
+
+Always preview writes with `--dry-run` first.
+
+### Export
+```bash
+apple-notes --json export "Note Title"            # Markdown + YAML frontmatter
+apple-notes export --all --output ./exported/     # bulk export
+```
+
+## Output
+
+All `--json` commands return: `{"status": "ok", "data": ...}` or `{"status": "error", "error": {...}}`
 
 ## Usage Patterns
 
-**Finding a note by topic:** Use `search_notes` with hybrid mode first. If semantic search is unavailable, it falls back to text automatically.
+**Finding a note:** Use `search` with hybrid mode first. Falls back to text if semantic unavailable.
 
-**Browsing a folder:** Use `list_notes` with the `folder` parameter. Use `limit` to avoid overwhelming output.
+**Browsing a folder:** Use `list --folder "Name" --limit 10` to avoid overwhelming output.
 
-**Reading note content:** Use `get_note` — returns decoded plaintext content, not raw protobuf.
+**Reading content:** `get` returns decoded plaintext content, not raw protobuf.
 
-**Creating notes:** Pass Markdown in the `body` param — it's converted to HTML automatically. No need to write HTML.
+**Creating notes:** Pass Markdown in `--body` — it's converted to HTML automatically.
 
-**Bulk operations:** For working through many notes (triage, audit), use `list_notes` with sort/order to work through them systematically. Use the `/notes-triage` command for guided cleanup.
+**Bulk operations:** Use `list` with `--sort-by modified --order desc` to work through notes systematically. Use `/notes-triage` for guided cleanup.

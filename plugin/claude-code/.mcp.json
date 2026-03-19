@@ -1,7 +1,0 @@
-{
-  "apple-notes": {
-    "type": "stdio",
-    "command": "python3",
-    "args": ["-m", "apple_notes.mcp_server"]
-  }
-}

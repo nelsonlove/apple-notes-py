@@ -63,14 +63,14 @@ notes search "query" --limit 5 --json
 
 Library-first design — all modules return dicts/lists, CLI is a thin formatting layer.
 
-| Module | Purpose |
-|--------|---------|
-| `db.py` | SQLite read-only access to NoteStore.sqlite |
-| `decode.py` | gzip + protobuf content decoding |
-| `jxa.py` | JXA subprocess calls for note creation |
-| `search.py` | LanceDB + sentence-transformers + FTS + RRF fusion |
-| `convert.py` | HTML/Markdown conversion |
-| `cli.py` | Click CLI |
+| Module       | Purpose                                            |
+|--------------|----------------------------------------------------|
+| `db.py`      | SQLite read-only access to NoteStore.sqlite        |
+| `decode.py`  | gzip + protobuf content decoding                   |
+| `jxa.py`     | JXA subprocess calls for note creation             |
+| `search.py`  | LanceDB + sentence-transformers + FTS + RRF fusion |
+| `convert.py` | HTML/Markdown conversion                           |
+| `cli.py`     | Click CLI                                          |
 
 ## Dependencies
 
