@@ -1,77 +1,81 @@
-# apple-notes
+# apple-notes-py
 
-CLI and library for reading, creating, and searching Apple Notes.
+Python library, CLI, and MCP server for Apple Notes on macOS.
 
-- **Read** notes, folders, and content via direct SQLite access + protobuf decoding
-- **Create** notes via JXA (JavaScript for Automation)
-- **Export** notes to Markdown files with YAML front-matter
-- **Import** Markdown files into Apple Notes
-- **Search** with text, semantic (sentence-transformers), or hybrid (RRF fusion) modes
+## Features
 
-Requires macOS with Full Disk Access enabled for the terminal.
+- Read notes, folders, and content via direct SQLite access + protobuf decoding
+- Create, delete, and move notes via JXA (JavaScript for Automation)
+- Search with text, semantic (sentence-transformers), or hybrid (RRF fusion) modes
+- Export notes to Markdown with YAML front-matter
+- Import Markdown files as Apple Notes
+- Optional semantic search index via LanceDB
+- Structured JSON output with `--json`
+- `--dry-run` on all write operations
 
-## Install
-
-```bash
-uv venv && uv pip install -e .
-```
-
-## Usage
+## Installation
 
 ```bash
-# List notes
-notes list
-notes list --folder "73.06 LLM outputs" --limit 10 --json
-
-# Get full note content
-notes get "Some Note Title"
-notes get --by-id 1234 --format json
-
-# List folders
-notes folders
-notes folders --json
-
-# Create a note (body is Markdown by default, converted to HTML)
-notes create "My Note" --body "Hello **world**"
-notes create "My Note" --body-file draft.md
-notes create "My Note" --body "<h1>Hi</h1>" --html
-
-# Export notes to Markdown
-notes export "Some Note Title"                  # print to stdout
-notes export "Some Note Title" -o note.md       # write to file
-notes export --by-id 1234 -o note.md            # by primary key
-notes export --folder "My Folder" -o ./out/     # all notes in folder
-notes export --all -o ./out/                    # every note
-
-# Import Markdown files as notes
-notes import note.md                            # single file
-notes import ./notes-dir/                       # all .md files in directory
-
-# Build semantic search index
-notes index
-notes index --force   # rebuild from scratch
-notes index --status  # show index stats
-
-# Search
-notes search "query"                    # hybrid (vector + FTS, RRF fusion)
-notes search "query" --mode text        # SQL LIKE search
-notes search "query" --mode semantic    # pure vector similarity
-notes search "query" --limit 5 --json
+pip install apple-notes-py  # or: pipx install apple-notes-py
+pip install 'apple-notes-py[search]'  # for semantic search
 ```
 
-## Architecture
+Requires macOS with Full Disk Access enabled for the terminal. Python 3.12+.
 
-Library-first design — all modules return dicts/lists, CLI is a thin formatting layer.
+## CLI
 
-| Module       | Purpose                                            |
-|--------------|----------------------------------------------------|
-| `db.py`      | SQLite read-only access to NoteStore.sqlite        |
-| `decode.py`  | gzip + protobuf content decoding                   |
-| `jxa.py`     | JXA subprocess calls for note creation             |
-| `search.py`  | LanceDB + sentence-transformers + FTS + RRF fusion |
-| `convert.py` | HTML/Markdown conversion                           |
-| `cli.py`     | Click CLI                                          |
+```bash
+apple-notes --help
+apple-notes list
+apple-notes list --folder "My Folder" --limit 10
+apple-notes get "Some Note Title"
+apple-notes get --by-id 1234
+apple-notes folders
+apple-notes create "My Note" --body "Hello **world**"
+apple-notes create "My Note" --body-file draft.md
+apple-notes delete "Old Note" --dry-run
+apple-notes move "My Note" "Archive"
+apple-notes search "query"
+apple-notes search "query" --mode text
+apple-notes search "query" --mode semantic --limit 5
+apple-notes export "Some Note Title" -o note.md
+apple-notes export --folder "My Folder" -o ./out/
+apple-notes export --all -o ./out/
+apple-notes import note.md
+apple-notes import ./notes-dir/
+apple-notes index
+apple-notes index --force
+apple-notes index --status
+apple-notes --json list
+```
 
-## Dependencies
+## Python API
 
-Python 3.12+. Key libraries: click, protobuf, lancedb, sentence-transformers, markdownify, markdown.
+```python
+from apple_notes.client import NotesClient
+
+client = NotesClient()
+notes = client.list_notes(folder="My Folder", limit=10)
+note = client.get_note(title="Some Note Title")
+folders = client.list_folders()
+client.create_note("Title", "Markdown body")
+client.delete_note("Old Note")
+client.move_note("My Note", "Archive")
+results = client.search("query", mode="hybrid", limit=20)
+md = client.export_note(title="Some Note Title")
+count = client.build_index(force=True)
+```
+
+## Development
+
+```bash
+git clone https://github.com/nelsonlove/apple-notes-py.git
+cd apple-notes-py
+uv sync --extra search --extra dev
+uv run pytest
+uv run apple-notes --help
+```
+
+## License
+
+MIT
